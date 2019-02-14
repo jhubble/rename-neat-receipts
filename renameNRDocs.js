@@ -38,22 +38,52 @@ const raw = (item,name) => {
 	return dequote(elem,'NO_SPACE');
 }
 
+const monthMap = [
+	'',
+	'Jan',
+	'Feb',
+	'Mar',
+	'Apr',
+	'May',
+	'Jun',
+	'Jul',
+	'Aug',
+	'Sep',
+	'Oct',
+	'Nov',
+	'Dec'
+];
+const dateToString = (date) => {
+	// take either 'raw' or 'underscored' date
+	date = date.replace(/(\d\d)[/_](\d\d)[/_](\d\d\d\d)/, (match, p1,p2,p3) => {
+		let stringDate = monthMap[p1-0] + ' '+
+			p2+', '+
+			p3;
+		return stringDate;
+	});
+	return date;
+}
+
+
 
 const getOldFile = (row) => {
 	if (headers.hasOwnProperty('Vendor')) {
 		// Receipt - Vendor - Amount - Payment Type
 		// Receipt - Vendor - Payment Type - Category
-		// Receipt - Vendor - Category - Random date
+		// Receipt - Vendor - Category - Date
 		// Receipt - Vendor - Amount - Category
-		// Receipt - Vendor - Payment Type - Random date
+		// Receipt - Vendor - Payment Type - Date
 		// Receipt - Amount - Payment Type - Category
-		// Receipt - Amount - Category - Random date
-		let fields = ['Vendor', 'Amount', 'Payment Type', 'Category'];
+		// Receipt - Amount - Category - Date
+		let fields = ['Vendor', 'Amount', 'Payment Type', 'Category', 'Receipt Date'];
 		let foundItems = [];
 		fields.forEach((field) => {
 			let val = raw(row,field);
 			if (field === 'Amount') {
 				val = (val == 0) ? "" : '$'+val;
+			}
+			if (field === 'Receipt Date') {
+				val = dateToString(val);
 			}
 			if (val) {
 				val = val.replace(/\s+$/, '');
@@ -131,13 +161,13 @@ docsArr.forEach((en) => {
 		}
 	}
 	oldfilename = oldfilename.replace(/[\s'"&:$]/g,'?');
-	//console.log("::",oldfilename, filename);
 	try {
 		execSync("echo '"+oldfilename+" "+filename+"' >>log.txt");
-		let foo = execSync("mv "+oldfilename+" "+filename);
+		// Don't overwrite existing name (not POSIX...)
+		execSync("mv -n "+oldfilename+" "+filename);
 	}
 	catch (e) {
-	//	console.log("ERROR");
+		console.error("ERROR renaming",oldfilename);
 	}
 
 });
