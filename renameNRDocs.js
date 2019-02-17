@@ -1,6 +1,7 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 
+let PROCESS_MULTIPLE = false;
 let fn = 'documents.csv';
 if (process.argv.length >2) {
 	fn = process.argv[2];
@@ -120,7 +121,7 @@ docsArr.forEach((en) => {
 	names[oldfile] = names[oldfile] ? names[oldfile]+1 : 1;
 
 });
-docsArr.forEach((en) => {
+docsArr = docsArr.map((en) => {
 	
 	let title = dequote(en[headers['Document Title']]);
 	let cat = dequote(en[headers['Category']]);
@@ -153,27 +154,54 @@ docsArr.forEach((en) => {
 	let oldfilename = getOldFile(en);
 	
 	if (names[oldfilename] > 1) {
-		curnames[oldfilename] = curnames[oldfilename] ? curnames[oldfilename]+1 : 1;
-		console.log(oldfilename, curnames[oldfilename], names[oldfilename]);
-		if (curnames[oldfilename] > 1) {
-			let index = curnames[oldfilename] -1;
-			oldfilename = oldfilename.replace(/\.pdf$/,'_'+index+'.pdf');
-		}
+			curnames[oldfilename] = curnames[oldfilename] ? curnames[oldfilename]+1 : 1;
+			console.log("multiple:", oldfilename, curnames[oldfilename], names[oldfilename]);
+			if (curnames[oldfilename] > 1) {
+				let index = curnames[oldfilename] -1;
+				oldfilename = oldfilename.replace(/\.pdf$/,'_'+index+'.pdf');
+			}
 	}
-	oldfilename = oldfilename.replace(/[\s'"&:$]/g,'?');
 	try {
-		execSync("echo '"+oldfilename+" "+filename+"' >>log.txt");
-		// Don't overwrite existing name (not POSIX...)
-		execSync("mv -n "+oldfilename+" "+filename);
+		if (PROCESS_MULTIPLE || names[oldfilename] === 1) {
+			oldfilename = oldfilename.replace(/[\s'"&:$]/g,'?');
+			execSync("echo '"+oldfilename+" "+filename+"' >>log.txt");
+			// Don't overwrite existing name (not POSIX...)
+			execSync("mv -n "+oldfilename+" "+filename);
+		}
+		// difficult to determine order of multiple files.
+		else {
+			oldfilename = oldfilename.replace(/[\s'"&:$]/g,'?');
+			execSync("echo 'NOT PROCESSING:"+oldfilename+" "+filename+"' >>log.txt");
+		}
+
 	}
 	catch (e) {
 		console.error("ERROR renaming",oldfilename);
 	}
-
+	finally {
+		en.unshift(filename);
+		en.unshift(oldfilename);
+	}
+	return en;
 });
+
+out = docsArr.map((ln) => {
+	if (ln) {
+		return ln.map((col) => {
+			// strip out all tabs and newlines 
+			return col.replace(/[\s\n\r]+/g,' ');
+		}).join("\t");
+	}
+}).join("\n");
+	
+fs.writeFileSync("processed."+fn+'.json',JSON.stringify(docsArr, null, 1));
+fs.writeFileSync("processed."+fn+'.tsv',out);
+
 
 
 // From stack overflow
+// https://stackoverflow.com/questions/1293147/javascript-code-to-parse-csv-data
+//
  function CSVToArray( strData, strDelimiter ){
         // Check to see if the delimiter is defined. If not,
         // then default to comma.
